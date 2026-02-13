@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -56,8 +56,13 @@ export const usersApi = {
 
 // News API
 export const newsApi = {
-  list: () => api.get('/news'),
+  list: (params) => api.get('/news', { params }),
   refresh: () => api.post('/news/refresh'),
+};
+
+// Quotes API
+export const quotesApi = {
+  list: () => api.get('/quotes'),
 };
 
 // Chat API
