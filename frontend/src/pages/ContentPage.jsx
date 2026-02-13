@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { pagesApi } from '../services/api';
 import MarkdownRenderer from '../components/common/MarkdownRenderer';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export default function ContentPage({ slug }) {
   const [page, setPage] = useState(null);
@@ -23,11 +24,7 @@ export default function ContentPage({ slug }) {
   }, [slug]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-forge-500 text-lg">Loading...</div>
-      </div>
-    );
+    return <LoadingSpinner fullPage />;
   }
 
   if (error || !page) {

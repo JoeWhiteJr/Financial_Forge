@@ -4,6 +4,7 @@ import { bloombergApi } from '../services/api';
 import CommandSearch from '../components/bloomberg/CommandSearch';
 import CategoryFilter from '../components/bloomberg/CategoryFilter';
 import CommandCard from '../components/bloomberg/CommandCard';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export default function BloombergGuide() {
   const [commands, setCommands] = useState([]);
@@ -96,9 +97,7 @@ export default function BloombergGuide() {
       {/* Content */}
       <div className="max-w-5xl mx-auto px-4 pb-12">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="text-forge-500 text-lg">Loading commands...</div>
-          </div>
+          <LoadingSpinner message="Loading commands..." />
         ) : commands.length === 0 ? (
           <div className="bg-gray-50 rounded-xl p-12 text-center">
             <p className="text-gray-500 text-lg">No commands found</p>

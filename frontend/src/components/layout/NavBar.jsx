@@ -1,5 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { Flame, LogIn, LogOut, User } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Flame, LogIn, LogOut, User, Shield } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
 
 const navLinks = [
@@ -15,11 +15,15 @@ const navLinks = [
 export default function NavBar() {
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
+
+  const isActive = (to) =>
+    to === '/' ? pathname === '/' : pathname.startsWith(to);
 
   return (
     <nav className="sticky top-0 z-50 bg-forge-700 text-white shadow-lg">
@@ -34,11 +38,28 @@ export default function NavBar() {
             <Link
               key={to}
               to={to}
-              className="px-3 py-1.5 text-sm rounded hover:bg-forge-600 transition-colors"
+              className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                isActive(to)
+                  ? 'bg-forge-600 text-white'
+                  : 'hover:bg-forge-600'
+              }`}
             >
               {label}
             </Link>
           ))}
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className={`px-3 py-1.5 text-sm rounded transition-colors flex items-center gap-1 ${
+                isActive('/admin')
+                  ? 'bg-forge-600 text-white'
+                  : 'hover:bg-forge-600'
+              }`}
+            >
+              <Shield size={14} />
+              Admin
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

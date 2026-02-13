@@ -8,6 +8,7 @@ import {
   MessageCircle,
   Flame,
   Newspaper,
+  CalendarDays,
 } from 'lucide-react';
 import NewsFeed from '../components/news/NewsFeed';
 
@@ -34,6 +35,33 @@ export default function Home() {
             Your team's centralized finance research platform. Investing guides, Bloomberg docs,
             curated reading, market news, and AI-powered document Q&A — all in one place.
           </p>
+        </div>
+      </div>
+
+      {/* Cary's Weekender Highlight */}
+      <div className="max-w-5xl mx-auto px-4 pt-12">
+        <div className="relative rounded-xl border-2 border-amber-400 bg-gradient-to-r from-forge-700 to-forge-600 p-6 shadow-lg overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="relative flex items-start gap-4">
+            <div className="flex-shrink-0 bg-amber-400 rounded-lg p-3">
+              <CalendarDays size={28} className="text-forge-900" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-white mb-1">
+                The Weekender &mdash; Cary's Monthly Market Outlook
+              </h2>
+              <p className="text-forge-200 text-sm mb-4">
+                Monthly newsletter covering market analysis, sector outlook, and investment themes.
+              </p>
+              <Link
+                to="/chat"
+                className="inline-flex items-center gap-2 bg-amber-500 text-forge-900 px-5 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors"
+              >
+                <MessageCircle size={16} />
+                Ask the Forge about it
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
 
