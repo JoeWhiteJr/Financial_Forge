@@ -1,0 +1,127 @@
+const { Router } = require('express');
+const multer = require('multer');
+const { pool } = require('../config/db');
+const logger = require('../config/logger');
+const { auth } = require('../middleware/auth');
+const adminOnly = require('../middleware/adminOnly');
+const { ingestPdf } = require('../services/ingestion');
+
+const router = Router();
+
+// Multer configuration for PDF uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'));
+    }
+  },
+});
+
+// POST /api/ingest — Upload and ingest a PDF (admin only)
+router.post('/', auth, adminOnly, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No PDF file provided' });
+    }
+
+    const { corpus } = req.body;
+    if (!corpus) {
+      return res.status(400).json({ success: false, error: 'Corpus name is required' });
+    }
+
+    const sourceFile = req.file.originalname;
+    logger.info({ corpus, sourceFile, fileSize: req.file.size }, 'PDF upload received');
+
+    const result = await ingestPdf(req.file.buffer, corpus, sourceFile);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    logger.error({ err }, 'PDF ingestion failed');
+
+    // Handle multer errors
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ success: false, error: 'File too large. Maximum size is 50MB.' });
+      }
+      return res.status(400).json({ success: false, error: err.message });
+    }
+
+    if (err.message === 'Only PDF files are allowed') {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+
+    res.status(500).json({ success: false, error: 'Failed to ingest PDF' });
+  }
+});
+
+// GET /api/ingest/:corpus/status — Get ingestion status for a corpus (admin only)
+router.get('/:corpus/status', auth, adminOnly, async (req, res) => {
+  try {
+    const { corpus } = req.params;
+
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as chunk_count FROM document_chunks WHERE corpus = $1',
+      [corpus]
+    );
+
+    const filesResult = await pool.query(
+      `SELECT DISTINCT source_file, COUNT(*) as chunks, MIN(created_at) as ingested_at
+       FROM document_chunks
+       WHERE corpus = $1
+       GROUP BY source_file
+       ORDER BY ingested_at DESC`,
+      [corpus]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        corpus,
+        chunk_count: parseInt(countResult.rows[0].chunk_count, 10),
+        source_files: filesResult.rows.map((r) => ({
+          source_file: r.source_file,
+          chunks: parseInt(r.chunks, 10),
+          ingested_at: r.ingested_at,
+        })),
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'Failed to get ingestion status');
+    res.status(500).json({ success: false, error: 'Failed to get ingestion status' });
+  }
+});
+
+// DELETE /api/ingest/:corpus — Clear all chunks for a corpus (admin only)
+router.delete('/:corpus', auth, adminOnly, async (req, res) => {
+  try {
+    const { corpus } = req.params;
+
+    const result = await pool.query(
+      'DELETE FROM document_chunks WHERE corpus = $1',
+      [corpus]
+    );
+
+    const deletedCount = result.rowCount;
+    logger.info({ corpus, deletedCount }, 'Corpus chunks deleted');
+
+    res.json({
+      success: true,
+      data: {
+        corpus,
+        deleted: deletedCount,
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'Failed to delete corpus');
+    res.status(500).json({ success: false, error: 'Failed to delete corpus' });
+  }
+});
+
+module.exports = router;
