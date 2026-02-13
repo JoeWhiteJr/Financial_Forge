@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen } from 'lucide-react';
 import { booksApi } from '../services/api';
 import CategoryFilter from '../components/bloomberg/CategoryFilter';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const difficultyColor = {
   Beginner: 'bg-green-100 text-green-700',
@@ -108,9 +109,7 @@ export default function ReadingList() {
       {/* Content */}
       <div className="max-w-5xl mx-auto px-4 pb-12">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="text-forge-500 text-lg">Loading books...</div>
-          </div>
+          <LoadingSpinner message="Loading books..." />
         ) : filtered.length === 0 ? (
           <div className="bg-gray-50 rounded-xl p-12 text-center">
             <p className="text-gray-500 text-lg">No books found</p>
