@@ -23,6 +23,7 @@ services:
       - ./backend:/app
       - /app/node_modules
       - ./database:/database
+      - /home/joe/Weekender:/data/weekender:ro
     env_file:
       - .env
     environment:

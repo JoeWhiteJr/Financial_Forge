@@ -8,6 +8,7 @@ module.exports = {
   finnhubApiKey: process.env.FINNHUB_API_KEY || '',
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+  voyageApiKey: process.env.VOYAGE_API_KEY || '',
   llmProvider: process.env.LLM_PROVIDER || 'gemini',
   embeddingProvider: process.env.EMBEDDING_PROVIDER || 'google',
   ragChunkSize: parseInt(process.env.RAG_CHUNK_SIZE || '500', 10),
