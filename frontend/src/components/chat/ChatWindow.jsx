@@ -2,7 +2,15 @@ import { useEffect, useRef } from 'react';
 import { Flame } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 
-export default function ChatWindow({ messages, loading }) {
+const EXAMPLE_QUESTIONS = [
+  'Explain DuPont Analysis',
+  "What did Buffett say about moats?",
+  'Summarize the latest Weekender',
+  'How do I run a DCF valuation?',
+  'What sectors does Cary recommend?',
+];
+
+export default function ChatWindow({ messages, loading, onExampleClick }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -19,10 +27,21 @@ export default function ChatWindow({ messages, loading }) {
           <h3 className="text-lg font-semibold text-forge-700 mb-1">
             Ask the Forge
           </h3>
-          <p className="text-sm text-gray-400 max-w-md">
+          <p className="text-sm text-gray-400 max-w-md mb-6">
             Ask the Forge a question to get started. You can query your documents,
             ask about finance, markets, and more.
           </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
+            {EXAMPLE_QUESTIONS.map((text) => (
+              <button
+                key={text}
+                onClick={() => onExampleClick?.(text)}
+                className="border border-gray-200 rounded-lg text-sm text-forge-600 px-3 py-2.5 text-left hover:bg-forge-50 hover:border-amber-300 transition-colors"
+              >
+                {text}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

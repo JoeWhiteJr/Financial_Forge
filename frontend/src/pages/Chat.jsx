@@ -20,6 +20,9 @@ export default function Chat() {
       .then(({ data: res }) => {
         const list = res.success ? res.data : Array.isArray(res) ? res : [];
         setCorpora(list);
+        if (list.length > 0 && !selectedCorpus) {
+          setSelectedCorpus(list[0].corpus);
+        }
       })
       .catch(() => setCorpora([]));
   }, []);
@@ -33,8 +36,8 @@ export default function Chat() {
     }
   }, [input]);
 
-  const handleSend = async () => {
-    const trimmed = input.trim();
+  const handleSend = async (overrideText) => {
+    const trimmed = (overrideText || input).trim();
     if (!trimmed || loading) return;
 
     // Add user message immediately
@@ -43,18 +46,30 @@ export default function Chat() {
     setInput('');
     setLoading(true);
 
+    if (!selectedCorpus) {
+      const errorMsg = {
+        role: 'assistant',
+        content: 'Please select a knowledge base from the dropdown first.',
+        sources: [],
+      };
+      setMessages((prev) => [userMessage, ...prev.slice(0, -1), errorMsg]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data: res } = await chatApi.send({
         message: trimmed,
-        corpus: selectedCorpus || undefined,
+        corpus: selectedCorpus,
         session_id: sessionId || undefined,
       });
 
       const responseData = res.success ? res.data : res;
+      const msg = responseData.message || responseData;
       const assistantMessage = {
         role: 'assistant',
-        content: responseData.response || responseData.content || '',
-        sources: responseData.sources || [],
+        content: msg.content || responseData.response || '',
+        sources: msg.sources || responseData.sources || [],
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -63,10 +78,10 @@ export default function Chat() {
         setSessionId(responseData.session_id);
       }
     } catch (err) {
+      const detail = err.response?.data?.error || err.message || 'Unknown error';
       const errorMsg = {
         role: 'assistant',
-        content:
-          'Sorry, I encountered an error processing your request. Please try again.',
+        content: `Error: ${detail}`,
         sources: [],
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -126,7 +141,7 @@ export default function Chat() {
       <div className="border-b border-gray-200 shrink-0" />
 
       {/* Chat window */}
-      <ChatWindow messages={messages} loading={loading} />
+      <ChatWindow messages={messages} loading={loading} onExampleClick={(text) => handleSend(text)} />
 
       {/* Input area */}
       <div className="shrink-0 pb-4 pt-2">

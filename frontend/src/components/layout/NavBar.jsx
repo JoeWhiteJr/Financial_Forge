@@ -1,15 +1,28 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Flame, LogIn, LogOut, User, Shield } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
+import NavDropdown from './NavDropdown';
 
-const navLinks = [
-  { to: '/', label: 'Home' },
-  { to: '/sector-analysis', label: 'Sector Analysis' },
-  { to: '/financial-analysis', label: 'Financial Analysis' },
-  { to: '/valuation', label: 'Valuation' },
-  { to: '/bloomberg', label: 'Bloomberg' },
-  { to: '/reading-list', label: 'Reading List' },
-  { to: '/chat', label: 'Chat' },
+const navStructure = [
+  { type: 'link', to: '/', label: 'Home' },
+  {
+    type: 'dropdown',
+    label: 'Research',
+    items: [
+      { to: '/sector-analysis', label: 'Sector Analysis' },
+      { to: '/financial-analysis', label: 'Financial Analysis' },
+      { to: '/valuation', label: 'Valuation' },
+    ],
+  },
+  {
+    type: 'dropdown',
+    label: 'Resources',
+    items: [
+      { to: '/bloomberg', label: 'Bloomberg Guide' },
+      { to: '/reading-list', label: 'Reading List' },
+    ],
+  },
+  { type: 'link', to: '/chat', label: 'Chat' },
 ];
 
 export default function NavBar() {
@@ -34,19 +47,27 @@ export default function NavBar() {
         </Link>
 
         <div className="flex items-center gap-1">
-          {navLinks.map(({ to, label }) => (
-            <Link
-              key={to}
-              to={to}
-              className={`px-3 py-1.5 text-sm rounded transition-colors ${
-                isActive(to)
-                  ? 'bg-forge-600 text-white'
-                  : 'hover:bg-forge-600'
-              }`}
-            >
-              {label}
-            </Link>
-          ))}
+          {navStructure.map((item) =>
+            item.type === 'dropdown' ? (
+              <NavDropdown
+                key={item.label}
+                label={item.label}
+                items={item.items}
+              />
+            ) : (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                  isActive(item.to)
+                    ? 'bg-forge-600 text-white'
+                    : 'hover:bg-forge-600'
+                }`}
+              >
+                {item.label}
+              </Link>
+            )
+          )}
           {isAdmin && (
             <Link
               to="/admin"

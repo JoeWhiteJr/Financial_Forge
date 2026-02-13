@@ -4,6 +4,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import ContentPage from './pages/ContentPage';
+import EnhancedContentPage from './pages/EnhancedContentPage';
 import BloombergGuide from './pages/BloombergGuide';
 import ReadingList from './pages/ReadingList';
 import Admin from './pages/Admin';
@@ -16,9 +17,9 @@ export default function App() {
         <Route element={<PageLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/sector-analysis" element={<ContentPage slug="sector-analysis" />} />
-          <Route path="/financial-analysis" element={<ContentPage slug="financial-analysis" />} />
-          <Route path="/valuation" element={<ContentPage slug="valuation" />} />
+          <Route path="/sector-analysis" element={<EnhancedContentPage slug="sector-analysis" />} />
+          <Route path="/financial-analysis" element={<EnhancedContentPage slug="financial-analysis" />} />
+          <Route path="/valuation" element={<EnhancedContentPage slug="valuation" />} />
           <Route path="/bloomberg" element={<BloombergGuide />} />
           <Route path="/reading-list" element={<ReadingList />} />
           <Route path="/chat" element={<Chat />} />

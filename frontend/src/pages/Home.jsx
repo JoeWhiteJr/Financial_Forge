@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   TrendingUp,
@@ -9,8 +10,11 @@ import {
   Flame,
   Newspaper,
   CalendarDays,
+  FileText,
 } from 'lucide-react';
 import NewsFeed from '../components/news/NewsFeed';
+import TickerTape from '../components/ticker/TickerTape';
+import { bloombergApi, booksApi, newsApi } from '../services/api';
 
 const sections = [
   { to: '/sector-analysis', icon: TrendingUp, title: 'Sector Analysis', desc: 'Industry frameworks and key metrics by sector' },
@@ -21,9 +25,74 @@ const sections = [
   { to: '/chat', icon: MessageCircle, title: 'Ask the Forge', desc: 'AI-powered Q&A over newsletters, Buffett letters, and more' },
 ];
 
+function QuickStats() {
+  const [stats, setStats] = useState({
+    guides: 3,
+    bloomberg: null,
+    books: null,
+    news: null,
+  });
+
+  useEffect(() => {
+    // Fetch counts in parallel — fail silently per stat
+    bloombergApi.list().then(({ data: res }) => {
+      if (res.success) {
+        setStats((prev) => ({ ...prev, bloomberg: res.data.length }));
+      }
+    }).catch(() => {});
+
+    booksApi.list().then(({ data: res }) => {
+      if (res.success) {
+        setStats((prev) => ({ ...prev, books: res.data.length }));
+      }
+    }).catch(() => {});
+
+    newsApi.list().then(({ data: res }) => {
+      if (res.success) {
+        setStats((prev) => ({ ...prev, news: res.data.length }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const cards = [
+    { icon: FileText, value: stats.guides, label: 'Research Guides', color: 'text-forge-500' },
+    { icon: Monitor, value: stats.bloomberg, label: 'Bloomberg Commands', color: 'text-amber-500' },
+    { icon: BookOpen, value: stats.books, label: 'Books', color: 'text-forge-500' },
+    { icon: Newspaper, value: stats.news, label: 'News Articles', color: 'text-amber-500' },
+  ];
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 pt-8">
+      <div className="grid grid-cols-4 gap-4">
+        {cards.map(({ icon: Icon, value, label, color }) => (
+          <div
+            key={label}
+            className="bg-white rounded-lg border border-gray-100 shadow-sm p-4 flex items-center gap-3"
+          >
+            <div className="bg-forge-50 rounded-lg p-2.5">
+              <Icon size={20} className={color} />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-forge-700">
+                {value !== null ? value : (
+                  <span className="inline-block w-8 h-6 bg-gray-100 rounded animate-pulse" />
+                )}
+              </div>
+              <div className="text-xs text-gray-500">{label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   return (
     <div>
+      {/* Ticker Tape */}
+      <TickerTape />
+
       {/* Hero */}
       <div className="bg-forge-700 text-white py-16">
         <div className="max-w-5xl mx-auto px-4 text-center">
@@ -65,6 +134,9 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Quick Stats */}
+      <QuickStats />
+
       {/* Section Cards */}
       <div className="max-w-5xl mx-auto px-4 py-12">
         <div className="grid grid-cols-3 gap-6">
@@ -88,6 +160,7 @@ export default function Home() {
             <h2 className="text-2xl font-bold text-forge-700">Market News</h2>
           </div>
           <NewsFeed limit={6} />
+          <p className="text-xs text-gray-400 mt-4 text-right">News powered by Finnhub & NewsAPI.org</p>
         </div>
 
         {/* Ask the Forge callout */}

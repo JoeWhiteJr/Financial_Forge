@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen } from 'lucide-react';
 import { booksApi } from '../services/api';
 import CategoryFilter from '../components/bloomberg/CategoryFilter';
+import CommandSearch from '../components/bloomberg/CommandSearch';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const difficultyColor = {
@@ -60,6 +61,7 @@ export default function ReadingList() {
   const [books, setBooks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,9 +77,14 @@ export default function ReadingList() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = selectedCategory
-    ? books.filter((b) => b.category === selectedCategory)
-    : books;
+  const filtered = books.filter((b) => {
+    const matchesCategory = !selectedCategory || b.category === selectedCategory;
+    const matchesSearch = !search.trim() ||
+      b.title?.toLowerCase().includes(search.toLowerCase()) ||
+      b.author?.toLowerCase().includes(search.toLowerCase()) ||
+      b.summary?.toLowerCase().includes(search.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div>
@@ -95,8 +102,13 @@ export default function ReadingList() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      {/* Search + Filters */}
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+        <CommandSearch
+          value={search}
+          onChange={setSearch}
+          placeholder="Search books by title, author, or topic..."
+        />
         {categories.length > 0 && (
           <CategoryFilter
             categories={categories}
