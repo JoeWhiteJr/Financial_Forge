@@ -60,4 +60,20 @@ export const newsApi = {
   refresh: () => api.post('/news/refresh'),
 };
 
+// Chat API
+export const chatApi = {
+  send: (data) => api.post('/chat', data),
+  history: (sessionId) => api.get(`/chat/${sessionId}`),
+  corpora: () => api.get('/chat/corpora/list'),
+};
+
+// Ingest API
+export const ingestApi = {
+  upload: (formData) => api.post('/ingest', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  status: (corpus) => api.get(`/ingest/${corpus}/status`),
+  clear: (corpus) => api.delete(`/ingest/${corpus}`),
+};
+
 export default api;

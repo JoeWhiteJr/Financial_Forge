@@ -11,8 +11,13 @@ import {
   Save,
   X,
   Check,
+  Upload,
+  RefreshCw,
+  AlertTriangle,
+  Database,
+  File,
 } from 'lucide-react';
-import { pagesApi, bloombergApi, booksApi, usersApi } from '../services/api';
+import { pagesApi, bloombergApi, booksApi, usersApi, ingestApi, chatApi } from '../services/api';
 import MarkdownEditor from '../components/editor/MarkdownEditor';
 
 const tabs = [
@@ -20,6 +25,7 @@ const tabs = [
   { key: 'bloomberg', label: 'Bloomberg', icon: Monitor },
   { key: 'reading', label: 'Reading List', icon: BookOpen },
   { key: 'users', label: 'Users', icon: Users },
+  { key: 'ingestion', label: 'Ingestion', icon: Upload },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -818,6 +824,287 @@ function UsersTab() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Ingestion Tab                                                      */
+/* ------------------------------------------------------------------ */
+function IngestionTab() {
+  const [file, setFile] = useState(null);
+  const [corpusName, setCorpusName] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [corpora, setCorpora] = useState([]);
+  const [selectedCorpus, setSelectedCorpus] = useState('');
+  const [corpusStatus, setCorpusStatus] = useState(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [loadingCorpora, setLoadingCorpora] = useState(true);
+
+  const fetchCorpora = useCallback(() => {
+    setLoadingCorpora(true);
+    chatApi
+      .corpora()
+      .then(({ data: res }) => {
+        const list = res.success ? res.data : Array.isArray(res) ? res : [];
+        setCorpora(list);
+      })
+      .catch(() => setCorpora([]))
+      .finally(() => setLoadingCorpora(false));
+  }, []);
+
+  useEffect(() => {
+    fetchCorpora();
+  }, [fetchCorpora]);
+
+  // Fetch status when selected corpus changes
+  useEffect(() => {
+    if (!selectedCorpus) {
+      setCorpusStatus(null);
+      return;
+    }
+    setStatusLoading(true);
+    ingestApi
+      .status(selectedCorpus)
+      .then(({ data: res }) => {
+        setCorpusStatus(res.success ? res.data : res);
+      })
+      .catch(() => setCorpusStatus(null))
+      .finally(() => setStatusLoading(false));
+  }, [selectedCorpus]);
+
+  const handleUpload = async () => {
+    if (!file || !corpusName.trim()) {
+      setMsg({ type: 'error', text: 'Please select a file and enter a corpus name.' });
+      return;
+    }
+    setUploading(true);
+    setMsg(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('corpus', corpusName.trim());
+
+    try {
+      const { data: res } = await ingestApi.upload(formData);
+      const result = res.success ? res.data : res;
+      const chunks = result.chunks ?? result.chunk_count ?? 'unknown';
+      setMsg({
+        type: 'success',
+        text: `Successfully ingested "${file.name}" into corpus "${corpusName.trim()}" (${chunks} chunks).`,
+      });
+      setFile(null);
+      setCorpusName('');
+      // Reset file input
+      const fileInput = document.getElementById('ingest-file-input');
+      if (fileInput) fileInput.value = '';
+      // Refresh corpora list
+      fetchCorpora();
+    } catch (err) {
+      setMsg({
+        type: 'error',
+        text: err.response?.data?.error || 'Failed to upload file. Please try again.',
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleClearCorpus = async () => {
+    if (!selectedCorpus) return;
+    if (!window.confirm(`Are you sure you want to clear all data in corpus "${selectedCorpus}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await ingestApi.clear(selectedCorpus);
+      setMsg({ type: 'success', text: `Corpus "${selectedCorpus}" has been cleared.` });
+      setSelectedCorpus('');
+      setCorpusStatus(null);
+      fetchCorpora();
+    } catch {
+      setMsg({ type: 'error', text: 'Failed to clear corpus.' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Upload section */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
+          Upload Document
+        </h3>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-forge-700 mb-1.5">
+                PDF File
+              </label>
+              <input
+                id="ingest-file-input"
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4
+                  file:rounded-lg file:border-0 file:text-sm file:font-medium
+                  file:bg-forge-100 file:text-forge-700 hover:file:bg-forge-200
+                  file:cursor-pointer file:transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-forge-700 mb-1.5">
+                Corpus Name
+              </label>
+              <input
+                type="text"
+                value={corpusName}
+                onChange={(e) => setCorpusName(e.target.value)}
+                placeholder='e.g. "weekender", "buffett", "project2025"'
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+                  focus:outline-none focus:ring-2 focus:ring-forge-500 focus:border-forge-500"
+              />
+            </div>
+          </div>
+
+          {file && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <File size={14} className="text-forge-500" />
+              <span>{file.name}</span>
+              <span className="text-gray-400">({(file.size / 1024).toFixed(1)} KB)</span>
+            </div>
+          )}
+
+          <button
+            onClick={handleUpload}
+            disabled={uploading || !file || !corpusName.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-forge-900
+              rounded-lg text-sm font-medium hover:bg-amber-400
+              disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {uploading ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload size={16} />
+                Upload & Ingest
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Status messages */}
+      {msg && (
+        <div
+          className={`p-3 rounded-lg text-sm ${
+            msg.type === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-700'
+              : 'bg-red-50 border border-red-200 text-red-700'
+          }`}
+        >
+          {msg.text}
+        </div>
+      )}
+
+      {/* Corpus status section */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
+          Corpus Management
+        </h3>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Database size={16} className="text-forge-500" />
+              <select
+                value={selectedCorpus}
+                onChange={(e) => setSelectedCorpus(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
+                  focus:outline-none focus:ring-2 focus:ring-forge-500 min-w-[200px]"
+              >
+                <option value="">Select a corpus...</option>
+                {corpora.map((c) => (
+                  <option key={c.corpus} value={c.corpus}>
+                    {c.corpus} ({c.chunks} chunks)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={fetchCorpora}
+              disabled={loadingCorpora}
+              className="p-2 text-gray-400 hover:text-forge-600 transition-colors"
+              title="Refresh corpora list"
+            >
+              <RefreshCw size={16} className={loadingCorpora ? 'animate-spin' : ''} />
+            </button>
+          </div>
+
+          {selectedCorpus && (
+            <div className="space-y-3">
+              {statusLoading ? (
+                <div className="text-forge-500 py-4 text-center text-sm">
+                  Loading corpus status...
+                </div>
+              ) : corpusStatus ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">Corpus</p>
+                      <p className="text-sm font-semibold text-forge-700">{selectedCorpus}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">Chunks</p>
+                      <p className="text-sm font-semibold text-forge-700">
+                        {corpusStatus.chunks ?? corpusStatus.chunk_count ?? 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {corpusStatus.source_files && corpusStatus.source_files.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+                        Source Files
+                      </p>
+                      <ul className="space-y-1">
+                        {corpusStatus.source_files.map((f, i) => (
+                          <li key={i} className="flex items-center gap-1.5 text-sm text-gray-600">
+                            <File size={13} className="text-gray-400 shrink-0" />
+                            {typeof f === 'string' ? f : f.name || f.filename || JSON.stringify(f)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-gray-400 py-4 text-center text-sm">
+                  Could not load status for this corpus.
+                </div>
+              )}
+
+              <button
+                onClick={handleClearCorpus}
+                className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600
+                  border border-red-200 rounded-lg text-sm font-medium
+                  hover:bg-red-100 transition-colors"
+              >
+                <AlertTriangle size={15} />
+                Clear Corpus
+              </button>
+            </div>
+          )}
+
+          {corpora.length === 0 && !loadingCorpora && (
+            <div className="text-gray-400 py-4 text-center text-sm">
+              No corpora found. Upload a document to create one.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Admin Page                                                         */
 /* ------------------------------------------------------------------ */
 export default function Admin() {
@@ -855,6 +1142,7 @@ export default function Admin() {
         {activeTab === 'bloomberg' && <BloombergTab />}
         {activeTab === 'reading' && <ReadingTab />}
         {activeTab === 'users' && <UsersTab />}
+        {activeTab === 'ingestion' && <IngestionTab />}
       </div>
     </div>
   );

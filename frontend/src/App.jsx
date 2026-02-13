@@ -7,6 +7,7 @@ import ContentPage from './pages/ContentPage';
 import BloombergGuide from './pages/BloombergGuide';
 import ReadingList from './pages/ReadingList';
 import Admin from './pages/Admin';
+import Chat from './pages/Chat';
 
 export default function App() {
   return (
@@ -20,7 +21,7 @@ export default function App() {
           <Route path="/valuation" element={<ContentPage slug="valuation" />} />
           <Route path="/bloomberg" element={<BloombergGuide />} />
           <Route path="/reading-list" element={<ReadingList />} />
-          <Route path="/chat" element={<ContentPage slug="chat" />} />
+          <Route path="/chat" element={<Chat />} />
           <Route
             path="/admin"
             element={
