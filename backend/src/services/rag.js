@@ -27,12 +27,13 @@ async function queryRag(question, corpus) {
   const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
   // Step 2: Search document_chunks by cosine similarity
+  // Note: pgvector parameterized queries require cast through text first
   const { rows: chunks } = await pool.query(
     `SELECT id, corpus, source_file, chunk_index, content, metadata,
-            1 - (embedding <=> $1::vector) as similarity
+            1 - (embedding <=> $1::text::vector) as similarity
      FROM document_chunks
      WHERE corpus = $2
-     ORDER BY embedding <=> $1::vector
+     ORDER BY embedding <=> $1::text::vector
      LIMIT $3`,
     [embeddingStr, corpus, env.ragTopK]
   );

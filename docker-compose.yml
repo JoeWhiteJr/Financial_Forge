@@ -23,13 +23,10 @@ services:
       - ./backend:/app
       - /app/node_modules
       - ./database:/database
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/financial_forge
-      JWT_SECRET: dev-secret-change-in-production-min-32-chars-long
-      JWT_EXPIRY: 7d
-      PORT: 3001
-      NODE_ENV: development
-      FRONTEND_URL: http://localhost:5173
     depends_on:
       db:
         condition: service_healthy

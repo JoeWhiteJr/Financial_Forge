@@ -34,7 +34,7 @@ async function embedQuery(text) {
 }
 
 /**
- * Generate an embedding using Google's text-embedding-004 model.
+ * Generate an embedding using Google's gemini-embedding-001 model.
  * @param {string} text - The text to embed
  * @param {string} taskType - Either 'RETRIEVAL_DOCUMENT' or 'RETRIEVAL_QUERY'
  * @returns {Promise<number[]>} Array of 768-dimensional embedding values
@@ -45,17 +45,19 @@ async function generateGoogleEmbedding(text, taskType) {
   }
 
   try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(env.geminiApiKey);
+    const { GoogleGenAI } = await import('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
 
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
-
-    const result = await model.embedContent({
-      content: { parts: [{ text }] },
-      taskType,
+    const result = await ai.models.embedContent({
+      model: 'gemini-embedding-001',
+      contents: text,
+      config: {
+        taskType,
+        outputDimensionality: 768,
+      },
     });
 
-    return result.embedding.values;
+    return result.embeddings[0].values;
   } catch (err) {
     logger.error({ err, taskType }, 'Google embedding API error');
     throw new Error(`Failed to generate embedding: ${err.message}`);

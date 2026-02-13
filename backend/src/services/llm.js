@@ -12,17 +12,61 @@ const SYSTEM_INSTRUCTION = `You are a finance research assistant for Financial F
 async function generateResponse(prompt, context = []) {
   const provider = env.llmProvider;
 
-  if (provider === 'gemini') {
+  if (provider === 'anthropic') {
+    return generateAnthropicResponse(prompt, context);
+  } else if (provider === 'gemini') {
     return generateGeminiResponse(prompt, context);
-  } else if (provider === 'anthropic') {
-    throw new Error('Anthropic provider not yet implemented');
   } else {
     throw new Error(`Unknown LLM provider: ${provider}`);
   }
 }
 
 /**
- * Generate a response using Google Gemini.
+ * Build the user message with RAG context prepended.
+ */
+function buildUserMessage(prompt, context) {
+  if (context.length === 0) return prompt;
+
+  let msg = 'Here is the relevant context from the knowledge base:\n\n';
+  context.forEach((chunk, i) => {
+    msg += `--- Context ${i + 1} (Source: ${chunk.source_file}, Chunk ${chunk.chunk_index}) ---\n`;
+    msg += `${chunk.content}\n\n`;
+  });
+  msg += '---\n\n';
+  msg += `Based on the context above, please answer the following question:\n\n${prompt}`;
+  return msg;
+}
+
+/**
+ * Generate a response using Anthropic Claude Sonnet 4.5.
+ */
+async function generateAnthropicResponse(prompt, context) {
+  if (!env.anthropicApiKey) {
+    return 'Error: Anthropic API key is not configured. Please set the ANTHROPIC_API_KEY environment variable.';
+  }
+
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: env.anthropicApiKey });
+
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 2048,
+      system: SYSTEM_INSTRUCTION,
+      messages: [
+        { role: 'user', content: buildUserMessage(prompt, context) },
+      ],
+    });
+
+    return message.content[0].text;
+  } catch (err) {
+    logger.error({ err }, 'Anthropic API error');
+    return `Error generating response: ${err.message}`;
+  }
+}
+
+/**
+ * Generate a response using Google Gemini (fallback).
  */
 async function generateGeminiResponse(prompt, context) {
   if (!env.geminiApiKey) {
@@ -30,32 +74,18 @@ async function generateGeminiResponse(prompt, context) {
   }
 
   try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(env.geminiApiKey);
+    const { GoogleGenAI } = await import('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
 
-    const model = genAI.getGenerativeModel({
+    const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
-      systemInstruction: SYSTEM_INSTRUCTION,
+      contents: buildUserMessage(prompt, context),
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+      },
     });
 
-    // Build the full prompt with context
-    let fullPrompt = '';
-
-    if (context.length > 0) {
-      fullPrompt += 'Here is the relevant context from the knowledge base:\n\n';
-      context.forEach((chunk, i) => {
-        fullPrompt += `--- Context ${i + 1} (Source: ${chunk.source_file}, Chunk ${chunk.chunk_index}) ---\n`;
-        fullPrompt += `${chunk.content}\n\n`;
-      });
-      fullPrompt += '---\n\n';
-      fullPrompt += `Based on the context above, please answer the following question:\n\n${prompt}`;
-    } else {
-      fullPrompt = prompt;
-    }
-
-    const result = await model.generateContent(fullPrompt);
-    const response = result.response;
-    return response.text();
+    return response.text;
   } catch (err) {
     logger.error({ err }, 'Gemini API error');
     return `Error generating response: ${err.message}`;
