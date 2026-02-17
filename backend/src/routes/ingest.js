@@ -21,8 +21,37 @@ const upload = multer({
   },
 });
 
+// Wrap multer to handle its errors inside the route handler
+function handleUpload(req, res) {
+  return new Promise((resolve, reject) => {
+    upload.array('files', 20)(req, res, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 // POST /api/ingest — Upload and ingest PDFs (admin only, up to 20 files)
-router.post('/', auth, adminOnly, upload.array('files', 20), async (req, res) => {
+router.post('/', auth, adminOnly, async (req, res) => {
+  try {
+    await handleUpload(req, res);
+  } catch (err) {
+    logger.error({ err }, 'File upload failed');
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ success: false, error: 'File too large. Maximum size is 50MB per file.' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ success: false, error: 'Too many files. Maximum is 20.' });
+      }
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    if (err.message === 'Only PDF files are allowed') {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    return res.status(500).json({ success: false, error: 'Failed to process upload' });
+  }
+
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, error: 'No PDF files provided' });
@@ -60,22 +89,6 @@ router.post('/', auth, adminOnly, upload.array('files', 20), async (req, res) =>
     });
   } catch (err) {
     logger.error({ err }, 'PDF ingestion failed');
-
-    // Handle multer errors
-    if (err instanceof multer.MulterError) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ success: false, error: 'File too large. Maximum size is 50MB per file.' });
-      }
-      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-        return res.status(400).json({ success: false, error: 'Too many files. Maximum is 20.' });
-      }
-      return res.status(400).json({ success: false, error: err.message });
-    }
-
-    if (err.message === 'Only PDF files are allowed') {
-      return res.status(400).json({ success: false, error: err.message });
-    }
-
     res.status(500).json({ success: false, error: 'Failed to ingest PDFs' });
   }
 });
