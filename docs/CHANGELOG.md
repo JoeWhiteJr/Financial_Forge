@@ -16,6 +16,9 @@ All notable changes to Financial Forge are documented in this file.
 - Backend processes files sequentially with per-file error handling (one failure doesn't abort batch)
 - Ingest API response now returns `{ corpus, total, succeeded, failed, results }` format
 
+### Fixed
+- Multer errors (too many files, file too large, non-PDF) now return proper 4xx responses instead of generic 500 (bd1699a)
+
 ## Sprint 4 — Polish, Scripts, and Production Config
 
 ### Added
