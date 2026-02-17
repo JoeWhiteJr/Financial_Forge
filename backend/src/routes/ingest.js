@@ -21,11 +21,11 @@ const upload = multer({
   },
 });
 
-// POST /api/ingest — Upload and ingest a PDF (admin only)
-router.post('/', auth, adminOnly, upload.single('file'), async (req, res) => {
+// POST /api/ingest — Upload and ingest PDFs (admin only, up to 20 files)
+router.post('/', auth, adminOnly, upload.array('files', 20), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No PDF file provided' });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, error: 'No PDF files provided' });
     }
 
     const { corpus } = req.body;
@@ -33,14 +33,30 @@ router.post('/', auth, adminOnly, upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Corpus name is required' });
     }
 
-    const sourceFile = req.file.originalname;
-    logger.info({ corpus, sourceFile, fileSize: req.file.size }, 'PDF upload received');
+    logger.info({ corpus, fileCount: req.files.length }, 'Multi-file PDF upload received');
 
-    const result = await ingestPdf(req.file.buffer, corpus, sourceFile);
+    const results = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const file of req.files) {
+      const sourceFile = file.originalname;
+      try {
+        logger.info({ corpus, sourceFile, fileSize: file.size }, 'Ingesting PDF');
+        const result = await ingestPdf(file.buffer, corpus, sourceFile);
+        const chunks = result.chunks ?? result.chunk_count ?? 0;
+        results.push({ sourceFile, success: true, chunks });
+        succeeded++;
+      } catch (fileErr) {
+        logger.error({ err: fileErr, sourceFile }, 'PDF ingestion failed for file');
+        results.push({ sourceFile, success: false, error: fileErr.message || 'Ingestion failed' });
+        failed++;
+      }
+    }
 
     res.json({
       success: true,
-      data: result,
+      data: { corpus, total: req.files.length, succeeded, failed, results },
     });
   } catch (err) {
     logger.error({ err }, 'PDF ingestion failed');
@@ -48,7 +64,10 @@ router.post('/', auth, adminOnly, upload.single('file'), async (req, res) => {
     // Handle multer errors
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ success: false, error: 'File too large. Maximum size is 50MB.' });
+        return res.status(413).json({ success: false, error: 'File too large. Maximum size is 50MB per file.' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ success: false, error: 'Too many files. Maximum is 20.' });
       }
       return res.status(400).json({ success: false, error: err.message });
     }
@@ -57,7 +76,7 @@ router.post('/', auth, adminOnly, upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: err.message });
     }
 
-    res.status(500).json({ success: false, error: 'Failed to ingest PDF' });
+    res.status(500).json({ success: false, error: 'Failed to ingest PDFs' });
   }
 });
 

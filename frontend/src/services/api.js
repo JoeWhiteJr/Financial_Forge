@@ -74,9 +74,18 @@ export const chatApi = {
 
 // Ingest API
 export const ingestApi = {
-  upload: (formData) => api.post('/ingest', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
+  upload: (files, corpus, onUploadProgress) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', file);
+    }
+    formData.append('corpus', corpus);
+    return api.post('/ingest', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 10 * 60 * 1000, // 10 minutes
+      onUploadProgress,
+    });
+  },
   status: (corpus) => api.get(`/ingest/${corpus}/status`),
   clear: (corpus) => api.delete(`/ingest/${corpus}`),
 };

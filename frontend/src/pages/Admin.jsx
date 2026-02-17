@@ -827,15 +827,21 @@ function UsersTab() {
 /*  Ingestion Tab                                                      */
 /* ------------------------------------------------------------------ */
 function IngestionTab() {
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [corpusMode, setCorpusMode] = useState('existing'); // 'existing' | 'new'
   const [corpusName, setCorpusName] = useState('');
+  const [existingCorpus, setExistingCorpus] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadResults, setUploadResults] = useState(null);
   const [msg, setMsg] = useState(null);
   const [corpora, setCorpora] = useState([]);
   const [selectedCorpus, setSelectedCorpus] = useState('');
   const [corpusStatus, setCorpusStatus] = useState(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [loadingCorpora, setLoadingCorpora] = useState(true);
+
+  const resolvedCorpus = corpusMode === 'existing' ? existingCorpus : corpusName.trim();
 
   const fetchCorpora = useCallback(() => {
     setLoadingCorpora(true);
@@ -870,39 +876,40 @@ function IngestionTab() {
   }, [selectedCorpus]);
 
   const handleUpload = async () => {
-    if (!file || !corpusName.trim()) {
-      setMsg({ type: 'error', text: 'Please select a file and enter a corpus name.' });
+    if (files.length === 0 || !resolvedCorpus) {
+      setMsg({ type: 'error', text: 'Please select files and specify a corpus.' });
       return;
     }
     setUploading(true);
+    setUploadProgress(0);
+    setUploadResults(null);
     setMsg(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('corpus', corpusName.trim());
-
     try {
-      const { data: res } = await ingestApi.upload(formData);
-      const result = res.success ? res.data : res;
-      const chunks = result.chunks ?? result.chunk_count ?? 'unknown';
-      setMsg({
-        type: 'success',
-        text: `Successfully ingested "${file.name}" into corpus "${corpusName.trim()}" (${chunks} chunks).`,
+      const { data: res } = await ingestApi.upload(files, resolvedCorpus, (e) => {
+        if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100));
       });
-      setFile(null);
+      const result = res.success ? res.data : res;
+      setUploadResults(result);
+      setMsg({
+        type: result.failed > 0 ? 'error' : 'success',
+        text: `Ingested ${result.succeeded}/${result.total} file(s) into "${result.corpus}".${
+          result.failed > 0 ? ` ${result.failed} failed.` : ''
+        }`,
+      });
+      setFiles([]);
       setCorpusName('');
-      // Reset file input
       const fileInput = document.getElementById('ingest-file-input');
       if (fileInput) fileInput.value = '';
-      // Refresh corpora list
       fetchCorpora();
     } catch (err) {
       setMsg({
         type: 'error',
-        text: err.response?.data?.error || 'Failed to upload file. Please try again.',
+        text: err.response?.data?.error || 'Failed to upload files. Please try again.',
       });
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -927,29 +934,80 @@ function IngestionTab() {
       {/* Upload section */}
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
-          Upload Document
+          Upload Documents
         </h3>
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-forge-700 mb-1.5">
-                PDF File
-              </label>
-              <input
-                id="ingest-file-input"
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4
-                  file:rounded-lg file:border-0 file:text-sm file:font-medium
-                  file:bg-forge-100 file:text-forge-700 hover:file:bg-forge-200
-                  file:cursor-pointer file:transition-colors"
-              />
+          {/* File picker */}
+          <div>
+            <label className="block text-sm font-medium text-forge-700 mb-1.5">
+              PDF Files (up to 20)
+            </label>
+            <input
+              id="ingest-file-input"
+              type="file"
+              accept=".pdf"
+              multiple
+              onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])}
+              className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4
+                file:rounded-lg file:border-0 file:text-sm file:font-medium
+                file:bg-forge-100 file:text-forge-700 hover:file:bg-forge-200
+                file:cursor-pointer file:transition-colors"
+            />
+          </div>
+
+          {files.length > 0 && (
+            <div className="space-y-1">
+              {files.map((f, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
+                  <File size={14} className="text-forge-500 shrink-0" />
+                  <span>{f.name}</span>
+                  <span className="text-gray-400">({(f.size / 1024).toFixed(1)} KB)</span>
+                </div>
+              ))}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-forge-700 mb-1.5">
-                Corpus Name
+          )}
+
+          {/* Corpus selector */}
+          <div>
+            <label className="block text-sm font-medium text-forge-700 mb-1.5">Corpus</label>
+            <div className="flex items-center gap-4 mb-2">
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="radio"
+                  name="corpusMode"
+                  checked={corpusMode === 'existing'}
+                  onChange={() => setCorpusMode('existing')}
+                  className="text-amber-500 focus:ring-forge-500"
+                />
+                Existing corpus
               </label>
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="radio"
+                  name="corpusMode"
+                  checked={corpusMode === 'new'}
+                  onChange={() => setCorpusMode('new')}
+                  className="text-amber-500 focus:ring-forge-500"
+                />
+                Create new
+              </label>
+            </div>
+
+            {corpusMode === 'existing' ? (
+              <select
+                value={existingCorpus}
+                onChange={(e) => setExistingCorpus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
+                  focus:outline-none focus:ring-2 focus:ring-forge-500"
+              >
+                <option value="">Select a corpus...</option>
+                {corpora.map((c) => (
+                  <option key={c.corpus} value={c.corpus}>
+                    {c.corpus} ({c.chunks} chunks)
+                  </option>
+                ))}
+              </select>
+            ) : (
               <input
                 type="text"
                 value={corpusName}
@@ -958,20 +1016,28 @@ function IngestionTab() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
                   focus:outline-none focus:ring-2 focus:ring-forge-500 focus:border-forge-500"
               />
-            </div>
+            )}
           </div>
 
-          {file && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <File size={14} className="text-forge-500" />
-              <span>{file.name}</span>
-              <span className="text-gray-400">({(file.size / 1024).toFixed(1)} KB)</span>
+          {/* Progress bar */}
+          {uploading && uploadProgress > 0 && (
+            <div>
+              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Uploading...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-amber-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
             </div>
           )}
 
           <button
             onClick={handleUpload}
-            disabled={uploading || !file || !corpusName.trim()}
+            disabled={uploading || files.length === 0 || !resolvedCorpus}
             className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-forge-900
               rounded-lg text-sm font-medium hover:bg-amber-400
               disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -979,15 +1045,42 @@ function IngestionTab() {
             {uploading ? (
               <>
                 <RefreshCw size={16} className="animate-spin" />
-                Uploading...
+                Ingesting...
               </>
             ) : (
               <>
                 <Upload size={16} />
-                Upload & Ingest
+                Upload & Ingest {files.length > 0 ? `(${files.length} file${files.length > 1 ? 's' : ''})` : ''}
               </>
             )}
           </button>
+
+          {/* Per-file results */}
+          {uploadResults && uploadResults.results && (
+            <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-1.5">
+              <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">
+                Results — {uploadResults.succeeded} succeeded, {uploadResults.failed} failed
+              </p>
+              {uploadResults.results.map((r, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  {r.success ? (
+                    <Check size={14} className="text-green-500 shrink-0" />
+                  ) : (
+                    <X size={14} className="text-red-500 shrink-0" />
+                  )}
+                  <span className={r.success ? 'text-gray-700' : 'text-red-600'}>
+                    {r.sourceFile}
+                  </span>
+                  {r.success && (
+                    <span className="text-gray-400 text-xs">({r.chunks} chunks)</span>
+                  )}
+                  {!r.success && r.error && (
+                    <span className="text-red-400 text-xs">— {r.error}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
